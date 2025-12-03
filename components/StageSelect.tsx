@@ -26,6 +26,7 @@ export default function StageSelect({ onSelectStage }: StageSelectProps) {
             return false
         }
     })
+    const [isMusicPlaying, setIsMusicPlaying] = useState(true)
 
     useEffect(() => {
         // Check active session and load progress
@@ -65,24 +66,60 @@ export default function StageSelect({ onSelectStage }: StageSelectProps) {
         } catch (e) {}
         if (homepageAudioRef.current) {
             homepageAudioRef.current.muted = isHomepageMuted
+            // If unmuting, try to play immediately
+            if (!isHomepageMuted) {
+                const playPromise = homepageAudioRef.current.play()
+                if (playPromise !== undefined) {
+                    playPromise
+                        .then(() => {
+                            setIsMusicPlaying(true)
+                        })
+                        .catch((e) => {
+                            console.warn('Play failed (autoplay policy):', e.message)
+                            setIsMusicPlaying(false)
+                        })
+                } else {
+                    setIsMusicPlaying(true)
+                }
+            } else {
+                // If muting, pause
+                homepageAudioRef.current.pause()
+                setIsMusicPlaying(false)
+            }
         }
     }, [isHomepageMuted])
 
     // Auto-play homepage music on mount (user gesture or browser policy might allow it)
     useEffect(() => {
-        const playHomepageMusic = async () => {
-            try {
-                if (homepageAudioRef.current && !isHomepageMuted) {
-                    homepageAudioRef.current.volume = 0.5
-                    await homepageAudioRef.current.play()
+        const playHomepageMusic = () => {
+            if (homepageAudioRef.current && !isHomepageMuted) {
+                homepageAudioRef.current.volume = 0.5
+                const playPromise = homepageAudioRef.current.play()
+                if (playPromise !== undefined) {
+                    playPromise
+                        .then(() => {
+                            setIsMusicPlaying(true)
+                        })
+                        .catch((e) => {
+                            console.warn('Homepage music autoplay blocked:', e.message)
+                            setIsMusicPlaying(false)
+                        })
+                } else {
+                    setIsMusicPlaying(true)
                 }
-            } catch (e) {
-                // Autoplay policy might block it; user can click mute button to start
-                console.warn('Homepage music autoplay blocked:', e)
             }
         }
         playHomepageMusic()
-    }, [])
+
+        // Also attempt to play when the page regains focus (e.g., returning from game)
+        const handleFocus = () => {
+            playHomepageMusic()
+        }
+        window.addEventListener('focus', handleFocus)
+        return () => {
+            window.removeEventListener('focus', handleFocus)
+        }
+    }, [isHomepageMuted])
 
     const handleLogout = async () => {
         await supabase.auth.signOut()
@@ -211,6 +248,29 @@ export default function StageSelect({ onSelectStage }: StageSelectProps) {
                 onClose={() => setIsAuthOpen(false)}
                 onLoginSuccess={(email) => setUserEmail(email)}
             />
+
+            {/* Play Music Prompt (if autoplay failed) */}
+            {!isMusicPlaying && !isHomepageMuted && (
+                <motion.div
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-neon-blue/20 border border-neon-blue rounded-full px-6 py-3 flex items-center gap-3 backdrop-blur-sm"
+                >
+                    <span className="text-white text-sm font-semibold">Enable sound?</span>
+                    <Button
+                        onClick={() => {
+                            if (homepageAudioRef.current) {
+                                homepageAudioRef.current.volume = 0.5
+                                void homepageAudioRef.current.play()
+                                setIsMusicPlaying(true)
+                            }
+                        }}
+                        className="bg-neon-blue hover:bg-cyan-400 text-black font-bold px-4 py-1 rounded-full text-sm"
+                    >
+                        <Play className="w-3 h-3 mr-1 fill-current" /> Play
+                    </Button>
+                </motion.div>
+            )}
 
             {/* Homepage music (place at public/music/homepage.mp3) */}
             <audio
