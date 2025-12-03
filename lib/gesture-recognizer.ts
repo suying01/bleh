@@ -1,10 +1,7 @@
 import { NormalizedLandmark } from "@mediapipe/tasks-vision";
 
-export type Gesture = "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J" | "K" | "L" | "M" | "N" | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" | "6-7" | "NONE";
+export type Gesture = "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J" | "K" | "L" | "M" | "N" | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" | "NONE";
 export type Orientation = "UP" | "DOWN" | "SIDE" | "NONE";
-
-let prevLandmarks: NormalizedLandmark[] | null = null;
-let verticalHistory: number[] = [];   // stores dy signs (-1 = up, +1 = down)
 
 export function checkOrientation(landmarks: NormalizedLandmark[]): Orientation {
     if (!landmarks || landmarks.length === 0) return "NONE";
@@ -77,50 +74,6 @@ export function recognizeGesture(landmarks: NormalizedLandmark[]): Gesture {
     const dThumbIndex = dist(thumbTip, indexTip);
     const dThumbMiddle = dist(thumbTip, middleTip);
     const dIndexMiddle = dist(indexTip, middleTip);
-
-    let motion = null;
-
-    if (prevLandmarks) {
-        const prevWrist = prevLandmarks[0];
-
-        const dx = wrist.x - prevWrist.x;
-        const dy = wrist.y - prevWrist.y;
-        const dz = wrist.z - prevWrist.z;
-
-        motion = { dx, dy, dz, speed: Math.hypot(dx, dy) };
-
-        let verticalDir = 0;
-
-        if (dy < -0.02) verticalDir = -1;  // Moving UP
-        if (dy >  0.02) verticalDir = +1;  // Moving DOWN
-
-        if (verticalDir !== 0) {
-            verticalHistory.push(verticalDir);
-            
-            // Keep last 20 frames
-            if (verticalHistory.length > 20) {
-                verticalHistory.shift();
-            }
-        }
-    }
-
-    // --- MOTION GESTURES ---
-    if (verticalHistory.length > 6) {
-        let directionChanges = 0;
-
-        for (let i = 1; i < verticalHistory.length; i++) {
-            if (verticalHistory[i] !== verticalHistory[i - 1]) {
-                directionChanges++;
-            }
-        }
-
-        // If there are 4+ alternations, that's a shake (UP-DOWN-UP-DOWN)
-        if (directionChanges >= 4) {
-            verticalHistory = []; // reset so it doesn't trigger nonstop
-            prevLandmarks = landmarks;
-            return "6-7";
-        }
-    }
 
     // --- LOGIC ---
 
@@ -265,8 +218,6 @@ export function recognizeGesture(landmarks: NormalizedLandmark[]): Gesture {
         if (dThumbIndex > 0.05 && dThumbIndex < 0.25) return "C";
         return "B"; // Flat hand
     }
-
-    prevLandmarks = landmarks;
     return "NONE";
 }
 
