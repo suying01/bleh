@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import SignStreamGame from '@/components/SignStreamGame'
+import ActionGame from '@/components/ActionGame'
 import StageSelect from '@/components/StageSelect'
 import HoleInTheWallGame from '@/components/HoleInTheWallGame'
 import { Stage } from '@/lib/stages'
@@ -12,11 +13,21 @@ export default function Home() {
 
   if (isChallengeMode) {
     return (
-      <HoleInTheWallGame onBack={() => setIsChallengeMode(false)} />
+      <HoleInTheWallGame
+        onBack={() => setIsChallengeMode(false)}
+      />
     )
   }
 
   if (currentStage) {
+    if (currentStage.id >= 2) {
+      return (
+        <ActionGame
+          stage={currentStage}
+          onBack={() => setCurrentStage(null)}
+        />
+      )
+    }
     return (
       <SignStreamGame
         stage={currentStage}

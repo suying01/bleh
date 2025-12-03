@@ -20,10 +20,10 @@ export const STAGES: Stage[] = [
     },
     {
         id: 2,
-        name: "Common Words",
-        description: "Everyday vocabulary.",
-        phrases: ["LOVE", "HELLO", "WORLD", "PEACE", "SMILE", "HAPPY", "FRIEND"],
-        speedMultiplier: 1.2,
+        name: "Action Words",
+        description: "Move your hands!",
+        phrases: ["NO", "TIME"],
+        speedMultiplier: 1.0, // Slower for actions
         requiredScore: 2000,
         color: "from-blue-400 to-cyan-600"
     },
