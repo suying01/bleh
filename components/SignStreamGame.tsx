@@ -12,7 +12,7 @@ import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
 import { FilesetResolver, HandLandmarker, DrawingUtils } from "@mediapipe/tasks-vision"
 import { saveScore } from '@/lib/scores'
-import { recognizeGesture, checkOrientation, Gesture, Orientation } from '@/lib/gesture-recognizer'
+import { recognizeGesture, checkOrientation, Gesture, Orientation, GestureBuffer, recognizeDynamicGesture } from '@/lib/gesture-recognizer'
 import { Stage } from '@/lib/stages'
 
 const TikTokIcon = ({ className }: { className?: string }) => (
@@ -24,7 +24,7 @@ const TikTokIcon = ({ className }: { className?: string }) => (
 // Types
 type Tile = {
     id: string
-    char: string
+    char: string // Can be a full word for Stage 2+
     lane: number // 0, 1, 2 (Left, Center, Right)
     y: number // 0 to 100 percentage
     speed: number
@@ -55,7 +55,7 @@ export default function SignStreamGame({ stage, onBack }: SignStreamGameProps) {
     const [countdown, setCountdown] = useState<number | null>(null)
     const [isModelLoading, setIsModelLoading] = useState(true)
     const [isWebcamActive, setIsWebcamActive] = useState(true)
-    const [detectedGesture, setDetectedGesture] = useState<Gesture>("NONE")
+    const [detectedGesture, setDetectedGesture] = useState<string>("NONE") // Changed to string to support words
     const [detectedOrientation, setDetectedOrientation] = useState<Orientation>("NONE")
     const [showHints, setShowHints] = useState(true) // Manual toggle
 
@@ -120,6 +120,9 @@ export default function SignStreamGame({ stage, onBack }: SignStreamGameProps) {
     const canvasRef = useRef<HTMLCanvasElement>(null)
     const handLandmarkerRef = useRef<HandLandmarker | null>(null)
 
+    // Dynamic Gesture Buffer
+    const gestureBufferRef = useRef<GestureBuffer>(new GestureBuffer(30));
+
     // Initialize MediaPipe
     useEffect(() => {
         const loadModel = async () => {
@@ -176,16 +179,13 @@ export default function SignStreamGame({ stage, onBack }: SignStreamGameProps) {
                             radius: 3
                         });
 
-                        // Recognize Gesture
-                        const gesture = recognizeGesture(landmarks);
-                        const orientation = checkOrientation(landmarks);
-                        setDetectedGesture(gesture);
-                        setDetectedOrientation(orientation);
+                        // Static Recognition Only
+                        setDetectedGesture(recognizeGesture(landmarks));
+                        setDetectedOrientation(checkOrientation(landmarks));
                     }
                 }
                 if (results.landmarks.length === 0) {
                     setDetectedGesture("NONE");
-                    setDetectedOrientation("NONE");
                 }
             }
         }

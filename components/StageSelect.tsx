@@ -11,9 +11,10 @@ import { supabase } from '@/lib/supabase/client'
 
 type StageSelectProps = {
     onSelectStage: (stage: Stage) => void
+    onSelectChallenge: () => void
 }
 
-export default function StageSelect({ onSelectStage }: StageSelectProps) {
+export default function StageSelect({ onSelectStage, onSelectChallenge }: StageSelectProps) {
     const [isAuthOpen, setIsAuthOpen] = useState(false)
     const [userEmail, setUserEmail] = useState<string | null>(null)
     const [completedStages, setCompletedStages] = useState<number[]>([])
@@ -182,7 +183,7 @@ export default function StageSelect({ onSelectStage }: StageSelectProps) {
                 )}
             </header>
 
-            <div className="w-full max-w-md flex flex-col gap-4">
+            <div className="w-full max-w-md flex flex-col gap-4 mb-8">
                 {STAGES.map((stage, index) => {
                     // Stage is locked if it's NOT the first one AND the previous stage hasn't been completed
                     const isLocked = index > 0 && !completedStages.includes(STAGES[index - 1].id)
@@ -230,6 +231,11 @@ export default function StageSelect({ onSelectStage }: StageSelectProps) {
                                             <Badge variant="secondary" className="bg-gray-800 text-gray-300">
                                                 {stage.speedMultiplier}x Speed
                                             </Badge>
+                                            {stage.id >= 2 && (
+                                                <Badge variant="outline" className="border-neon-pink text-neon-pink">
+                                                    Action Mode
+                                                </Badge>
+                                            )}
                                         </div>
                                         <div className="flex items-center gap-1 text-yellow-500">
                                             <Trophy className="w-4 h-4" />
@@ -242,6 +248,33 @@ export default function StageSelect({ onSelectStage }: StageSelectProps) {
                     )
                 })}
             </div>
+
+            {/* Special Challenge Button */}
+            <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.4 }}
+                className="w-full max-w-md"
+            >
+                <Button
+                    onClick={onSelectChallenge}
+                    className="w-full h-24 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 border-2 border-white/20 rounded-2xl relative overflow-hidden group"
+                >
+                    <div className="absolute inset-0 bg-[url('/noise.png')] opacity-10" />
+                    <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors" />
+
+                    <div className="relative z-10 flex flex-col items-center">
+                        <div className="text-2xl font-black italic tracking-tighter text-white drop-shadow-lg mb-1">
+                            HOLE IN THE WALL
+                        </div>
+                        <div className="text-xs font-bold text-white/80 bg-black/30 px-3 py-1 rounded-full border border-white/10">
+                            SPECIAL CHALLENGE
+                        </div>
+                    </div>
+
+                    <Play className="absolute right-6 w-8 h-8 text-white opacity-50 group-hover:opacity-100 group-hover:scale-110 transition-all" />
+                </Button>
+            </motion.div>
 
             <AuthModal
                 isOpen={isAuthOpen}
