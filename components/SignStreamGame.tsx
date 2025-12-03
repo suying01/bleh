@@ -299,6 +299,18 @@ export default function SignStreamGame({ stage, onBack }: SignStreamGameProps) {
                         setGameOver(true);
                         setGameWon(true);
                         saveScore(stage.id.toString(), score);
+
+                        // Save progress locally for guest/offline support
+                        try {
+                            const unlocked = JSON.parse(localStorage.getItem('unlockedStages') || '[]');
+                            if (!unlocked.includes(stage.id)) {
+                                unlocked.push(stage.id);
+                                localStorage.setItem('unlockedStages', JSON.stringify(unlocked));
+                            }
+                        } catch (e) {
+                            console.error("Failed to save local progress", e);
+                        }
+
                         // Recording will stop via useEffect after a delay
                     }
                 }

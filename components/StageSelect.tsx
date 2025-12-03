@@ -16,17 +16,46 @@ type StageSelectProps = {
 export default function StageSelect({ onSelectStage }: StageSelectProps) {
     const [isAuthOpen, setIsAuthOpen] = useState(false)
     const [userEmail, setUserEmail] = useState<string | null>(null)
+    const [completedStages, setCompletedStages] = useState<number[]>([])
 
     useEffect(() => {
-        // Check active session
-        supabase.auth.getSession().then(({ data: { session } }) => {
+        // Check active session and load progress
+        const loadProgress = async () => {
+            const { data: { session } } = await supabase.auth.getSession()
             setUserEmail(session?.user?.email ?? null)
-        })
+
+            if (session?.user) {
+                // Load from Supabase
+                const { data } = await supabase
+                    .from('scores')
+                    .select('stage_id')
+                    .eq('user_id', session.user.id)
+
+                if (data) {
+                    const stages = data.map((s: any) => parseInt(s.stage_id))
+                    setCompletedStages(stages)
+                }
+            } else {
+                // Load from LocalStorage
+                try {
+                    const local = JSON.parse(localStorage.getItem('unlockedStages') || '[]')
+                    setCompletedStages(local)
+                } catch (e) {
+                    console.error("Failed to load local progress", e)
+                }
+            }
+        }
+
+        loadProgress()
     }, [])
 
     const handleLogout = async () => {
         await supabase.auth.signOut()
         setUserEmail(null)
+        setCompletedStages([]) // Reset or fallback to local? Let's reset for clarity
+        // Optionally fallback to local:
+        // const local = JSON.parse(localStorage.getItem('unlockedStages') || '[]')
+        // setCompletedStages(local)
     }
 
     return (
@@ -62,57 +91,64 @@ export default function StageSelect({ onSelectStage }: StageSelectProps) {
             </header>
 
             <div className="w-full max-w-md flex flex-col gap-4">
-                {STAGES.map((stage, index) => (
-                    <motion.div
-                        key={stage.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: index * 0.1 }}
-                    >
-                        <Card
-                            className={cn(
-                                "bg-gray-900/50 border-2 hover:border-neon-blue transition-colors cursor-pointer group overflow-hidden relative",
-                                "border-gray-800"
-                            )}
-                            onClick={() => onSelectStage(stage)}
+                {STAGES.map((stage, index) => {
+                    // Stage is locked if it's NOT the first one AND the previous stage hasn't been completed
+                    const isLocked = index > 0 && !completedStages.includes(STAGES[index - 1].id)
+
+                    return (
+                        <motion.div
+                            key={stage.id}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: index * 0.1 }}
                         >
-                            <div className={cn("absolute inset-0 opacity-0 group-hover:opacity-10 bg-gradient-to-r transition-opacity", stage.color)} />
-
-                            <CardHeader className="flex flex-row items-center justify-between pb-2">
-                                <div className="flex flex-col">
-                                    <CardTitle className="text-xl font-bold text-white group-hover:text-neon-blue transition-colors">
-                                        {stage.id}. {stage.name}
-                                    </CardTitle>
-                                    <CardDescription className="text-gray-400">
-                                        {stage.description}
-                                    </CardDescription>
-                                </div>
-                                {index === 0 ? (
-                                    <Play className="text-neon-blue w-8 h-8 fill-current opacity-0 group-hover:opacity-100 transition-opacity" />
-                                ) : (
-                                    <Lock className="text-gray-600 w-6 h-6" />
+                            <Card
+                                className={cn(
+                                    "bg-gray-900/50 border-2 transition-all duration-300 overflow-hidden relative",
+                                    isLocked
+                                        ? "border-gray-800 opacity-50 cursor-not-allowed grayscale"
+                                        : "border-gray-800 hover:border-neon-blue cursor-pointer group"
                                 )}
-                            </CardHeader>
+                                onClick={() => !isLocked && onSelectStage(stage)}
+                            >
+                                <div className={cn("absolute inset-0 opacity-0 group-hover:opacity-10 bg-gradient-to-r transition-opacity", stage.color)} />
 
-                            <CardContent>
-                                <div className="flex justify-between items-center text-sm">
-                                    <div className="flex items-center gap-2">
-                                        <Badge variant="secondary" className="bg-gray-800 text-gray-300">
-                                            {stage.phrases.length} Phrases
-                                        </Badge>
-                                        <Badge variant="secondary" className="bg-gray-800 text-gray-300">
-                                            {stage.speedMultiplier}x Speed
-                                        </Badge>
+                                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                                    <div className="flex flex-col">
+                                        <CardTitle className={cn("text-xl font-bold transition-colors", isLocked ? "text-gray-500" : "text-white group-hover:text-neon-blue")}>
+                                            {stage.id}. {stage.name}
+                                        </CardTitle>
+                                        <CardDescription className="text-gray-400">
+                                            {stage.description}
+                                        </CardDescription>
                                     </div>
-                                    <div className="flex items-center gap-1 text-yellow-500">
-                                        <Trophy className="w-4 h-4" />
-                                        <span className="font-bold">{stage.requiredScore}</span>
+                                    {isLocked ? (
+                                        <Lock className="text-gray-600 w-6 h-6" />
+                                    ) : (
+                                        <Play className="text-neon-blue w-8 h-8 fill-current opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    )}
+                                </CardHeader>
+
+                                <CardContent>
+                                    <div className="flex justify-between items-center text-sm">
+                                        <div className="flex items-center gap-2">
+                                            <Badge variant="secondary" className="bg-gray-800 text-gray-300">
+                                                {stage.phrases.length} Phrases
+                                            </Badge>
+                                            <Badge variant="secondary" className="bg-gray-800 text-gray-300">
+                                                {stage.speedMultiplier}x Speed
+                                            </Badge>
+                                        </div>
+                                        <div className="flex items-center gap-1 text-yellow-500">
+                                            <Trophy className="w-4 h-4" />
+                                            <span className="font-bold">{stage.requiredScore}</span>
+                                        </div>
                                     </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </motion.div>
-                ))}
+                                </CardContent>
+                            </Card>
+                        </motion.div>
+                    )
+                })}
             </div>
 
             <AuthModal
