@@ -64,6 +64,37 @@ export default function SignStreamGame({ stage, onBack }: SignStreamGameProps) {
     const [recordingUrl, setRecordingUrl] = useState<string | null>(null)
     const mediaRecorderRef = useRef<MediaRecorder | null>(null)
     const recordedChunksRef = useRef<Blob[]>([])
+    // Audio (background music)
+    const audioRef = useRef<HTMLAudioElement | null>(null)
+    const hitAudioRef = useRef<HTMLAudioElement | null>(null)
+    const [isMusicMuted, setIsMusicMuted] = useState<boolean>(() => {
+        try {
+            const v = localStorage.getItem('signstream-muted')
+            return v === 'true'
+        } catch (e) {
+            return false
+        }
+    })
+    const [musicVolume, setMusicVolume] = useState<number>(() => {
+        try {
+            const v = localStorage.getItem('signstream-volume')
+            return v ? parseFloat(v) : 0.6
+        } catch (e) {
+            return 0.6
+        }
+    })
+
+    const playHitSound = async () => {
+        try {
+            if (hitAudioRef.current) {
+                hitAudioRef.current.currentTime = 0
+                await hitAudioRef.current.play()
+            }
+        } catch (e) {
+            // ignore play errors
+            console.warn('Hit sound play failed:', e)
+        }
+    }
 
     const rootRef = useRef<HTMLDivElement>(null)
 
@@ -324,6 +355,8 @@ export default function SignStreamGame({ stage, onBack }: SignStreamGameProps) {
                     newTiles[firstActiveTileIndex] = { ...newTiles[firstActiveTileIndex], isHit: true };
                     setScore(s => s + 100 + (streak * 10));
                     setStreak(s => s + 1);
+                    // Play hit sound
+                    void playHitSound()
                     return newTiles;
                 }
             }
@@ -360,6 +393,57 @@ export default function SignStreamGame({ stage, onBack }: SignStreamGameProps) {
         }
     }, [])
 
+    // Keep audio element properties in sync and persist preferences
+    useEffect(() => {
+        try {
+            localStorage.setItem('signstream-muted', String(isMusicMuted))
+        } catch (e) {}
+        if (audioRef.current) {
+            audioRef.current.muted = isMusicMuted
+        }
+    }, [isMusicMuted])
+
+    useEffect(() => {
+        try {
+            localStorage.setItem('signstream-volume', String(musicVolume))
+        } catch (e) {}
+        if (audioRef.current) {
+            audioRef.current.volume = musicVolume
+        }
+    }, [musicVolume])
+
+    // Pause audio on game over
+    useEffect(() => {
+        if (gameOver) {
+            try {
+                if (audioRef.current) {
+                    audioRef.current.pause()
+                }
+            } catch (e) {}
+        }
+    }, [gameOver])
+
+    // Fallback: ensure audio restarts if 'loop' isn't honored for some reason
+    useEffect(() => {
+        const audio = audioRef.current
+        if (!audio) return
+
+        const onEnded = () => {
+            try {
+                // Try to restart playback (fallback)
+                audio.currentTime = 0
+                void audio.play()
+            } catch (e) {
+                console.warn('Failed to restart audio on ended:', e)
+            }
+        }
+
+        audio.addEventListener('ended', onEnded)
+        return () => {
+            audio.removeEventListener('ended', onEnded)
+        }
+    }, [])
+
     // Start Game Sequence
     const startGame = async () => {
         setScore(0)
@@ -376,6 +460,19 @@ export default function SignStreamGame({ stage, onBack }: SignStreamGameProps) {
 
         if (isRecordingEnabled) {
             await startRecording();
+        }
+
+        // Start background music (user gesture from START button allows play)
+        try {
+            if (audioRef.current) {
+                audioRef.current.currentTime = 0
+                audioRef.current.volume = musicVolume
+                audioRef.current.muted = isMusicMuted
+                await audioRef.current.play()
+            }
+        } catch (e) {
+            // ignore play errors (autoplay policies) — will remain silent until user toggles
+            console.warn('Background audio play failed:', e)
         }
 
         let count = 3
@@ -395,6 +492,17 @@ export default function SignStreamGame({ stage, onBack }: SignStreamGameProps) {
         const text = `I scored ${score.toLocaleString()} in SignStream Stage ${stage.id}! 🤟 Can you beat me?`;
         navigator.clipboard.writeText(text);
         toast.success("Score copied to clipboard!");
+    }
+
+    // Pause/stop audio and then call onBack
+    const handleBack = () => {
+        try {
+            if (audioRef.current) {
+                audioRef.current.pause()
+                audioRef.current.currentTime = 0
+            }
+        } catch (e) {}
+        onBack()
     }
 
     const shareToSocial = (platform: 'tiktok' | 'instagram') => {
@@ -450,7 +558,7 @@ export default function SignStreamGame({ stage, onBack }: SignStreamGameProps) {
             {/* HUD Top */}
             <div className="relative z-10 p-4 flex justify-between items-start">
                 <div className="flex flex-col gap-1">
-                    <Button variant="ghost" size="icon" onClick={onBack} className="text-white hover:text-neon-blue mb-2">
+                    <Button variant="ghost" size="icon" onClick={handleBack} className="text-white hover:text-neon-blue mb-2">
                         <ArrowLeft />
                     </Button>
                     <Badge variant="outline" className="text-neon-blue border-neon-blue bg-black/50 backdrop-blur-md text-lg px-3 py-1">
@@ -470,6 +578,27 @@ export default function SignStreamGame({ stage, onBack }: SignStreamGameProps) {
                             checked={showHints}
                             onCheckedChange={setShowHints}
                             className="data-[state=checked]:bg-neon-blue"
+                        />
+                    </div>
+
+                    {/* Music toggle */}
+                    <div className="flex items-center gap-2 bg-black/50 backdrop-blur-md px-2 py-1 rounded-full border border-white/20">
+                        <button
+                            onClick={() => setIsMusicMuted(m => { const next = !m; try { localStorage.setItem('signstream-muted', String(next)) } catch(e){}; return next })}
+                            aria-label={isMusicMuted ? 'Unmute music' : 'Mute music'}
+                            className="text-white hover:text-neon-blue"
+                        >
+                            {isMusicMuted ? <VolumeX /> : <Volume2 />}
+                        </button>
+                        <input
+                            aria-label="Music volume"
+                            type="range"
+                            min={0}
+                            max={1}
+                            step={0.01}
+                            value={musicVolume}
+                            onChange={(e) => setMusicVolume(parseFloat(e.target.value))}
+                            className="w-24"
                         />
                     </div>
                 </div>
@@ -608,7 +737,7 @@ export default function SignStreamGame({ stage, onBack }: SignStreamGameProps) {
                         ) : null}
 
                         <Button
-                            onClick={onBack}
+                            onClick={handleBack}
                             className="bg-neon-blue hover:bg-cyan-400 text-black font-bold py-4 rounded-xl"
                         >
                             BACK TO MENU
@@ -654,6 +783,22 @@ export default function SignStreamGame({ stage, onBack }: SignStreamGameProps) {
                     </div>
                 </div>
             </div>
+
+            {/* Background audio element (place your file at public/music/background.mp3) */}
+            <audio
+                ref={audioRef}
+                src="/music/background.mp3"
+                loop
+                preload="auto"
+                style={{ display: 'none' }}
+            />
+            {/* Hit sound (place at public/sfx/hit.wav) */}
+            <audio
+                ref={hitAudioRef}
+                src="/sfx/hit.wav"
+                preload="auto"
+                style={{ display: 'none' }}
+            />
         </div>
     )
 }
