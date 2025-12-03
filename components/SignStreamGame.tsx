@@ -67,6 +67,7 @@ export default function SignStreamGame({ stage, onBack }: SignStreamGameProps) {
     // Audio (background music)
     const audioRef = useRef<HTMLAudioElement | null>(null)
     const hitAudioRef = useRef<HTMLAudioElement | null>(null)
+    const clearedAudioRef = useRef<HTMLAudioElement | null>(null)
     const [isMusicMuted, setIsMusicMuted] = useState<boolean>(() => {
         try {
             const v = localStorage.getItem('signstream-muted')
@@ -93,6 +94,18 @@ export default function SignStreamGame({ stage, onBack }: SignStreamGameProps) {
         } catch (e) {
             // ignore play errors
             console.warn('Hit sound play failed:', e)
+        }
+    }
+
+    const playClearedSound = async () => {
+        try {
+            if (clearedAudioRef.current) {
+                clearedAudioRef.current.currentTime = 0
+                await clearedAudioRef.current.play()
+            }
+        } catch (e) {
+            // ignore play errors
+            console.warn('Stage cleared sound play failed:', e)
         }
     }
 
@@ -299,6 +312,8 @@ export default function SignStreamGame({ stage, onBack }: SignStreamGameProps) {
                         setGameOver(true);
                         setGameWon(true);
                         saveScore(stage.id.toString(), score);
+                        // Play stage cleared sound
+                        void playClearedSound();
 
                         // Save progress locally for guest/offline support
                         try {
@@ -808,6 +823,13 @@ export default function SignStreamGame({ stage, onBack }: SignStreamGameProps) {
             <audio
                 ref={hitAudioRef}
                 src="/sfx/hit.wav"
+                preload="auto"
+                style={{ display: 'none' }}
+            />
+            {/* Stage cleared sound (place at public/sfx/stage-cleared.wav) */}
+            <audio
+                ref={clearedAudioRef}
+                src="/sfx/stage-cleared.wav"
                 preload="auto"
                 style={{ display: 'none' }}
             />
