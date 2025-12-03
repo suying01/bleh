@@ -116,7 +116,7 @@ export function recognizeGesture(landmarks: NormalizedLandmark[]): Gesture {
 
         // If there are 4+ alternations, that's a shake (UP-DOWN-UP-DOWN)
         if (directionChanges >= 4) {
-            //verticalHistory = []; // reset so it doesn't trigger nonstop
+            verticalHistory = []; // reset so it doesn't trigger nonstop
             prevLandmarks = landmarks;
             return "6-7";
         }
