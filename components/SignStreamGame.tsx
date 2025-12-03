@@ -207,7 +207,7 @@ export default function SignStreamGame({ stage, onBack }: SignStreamGameProps) {
                     mediaSource: 'tab',
                     preferCurrentTab: true
                 } as any,
-                audio: false,
+                audio: true,
                 preferCurrentTab: true
             } as any);
 
