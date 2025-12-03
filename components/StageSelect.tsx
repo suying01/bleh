@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Lock, Star, Trophy, User, Play } from 'lucide-react'
+import { Lock, Star, Trophy, User, Play, Volume2, VolumeX } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -17,6 +17,15 @@ export default function StageSelect({ onSelectStage }: StageSelectProps) {
     const [isAuthOpen, setIsAuthOpen] = useState(false)
     const [userEmail, setUserEmail] = useState<string | null>(null)
     const [completedStages, setCompletedStages] = useState<number[]>([])
+    const homepageAudioRef = React.useRef<HTMLAudioElement | null>(null)
+    const [isHomepageMuted, setIsHomepageMuted] = useState<boolean>(() => {
+        try {
+            const v = localStorage.getItem('signum-homepage-muted')
+            return v === 'true'
+        } catch (e) {
+            return false
+        }
+    })
 
     useEffect(() => {
         // Check active session and load progress
@@ -49,6 +58,32 @@ export default function StageSelect({ onSelectStage }: StageSelectProps) {
         loadProgress()
     }, [])
 
+    // Sync homepage mute state and start music on mount
+    useEffect(() => {
+        try {
+            localStorage.setItem('signum-homepage-muted', String(isHomepageMuted))
+        } catch (e) {}
+        if (homepageAudioRef.current) {
+            homepageAudioRef.current.muted = isHomepageMuted
+        }
+    }, [isHomepageMuted])
+
+    // Auto-play homepage music on mount (user gesture or browser policy might allow it)
+    useEffect(() => {
+        const playHomepageMusic = async () => {
+            try {
+                if (homepageAudioRef.current && !isHomepageMuted) {
+                    homepageAudioRef.current.volume = 0.5
+                    await homepageAudioRef.current.play()
+                }
+            } catch (e) {
+                // Autoplay policy might block it; user can click mute button to start
+                console.warn('Homepage music autoplay blocked:', e)
+            }
+        }
+        playHomepageMusic()
+    }, [])
+
     const handleLogout = async () => {
         await supabase.auth.signOut()
         setUserEmail(null)
@@ -63,13 +98,22 @@ export default function StageSelect({ onSelectStage }: StageSelectProps) {
             <header className="w-full max-w-md mb-8 flex justify-between items-center">
                 <div>
                     <h1 className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-neon-blue to-neon-pink mb-2 tracking-tighter italic">
-                        SignStream
+                        Signum
                     </h1>
                     <p className="text-gray-400">Select a Stage</p>
                 </div>
 
                 {userEmail ? (
                     <div className="flex items-center gap-2">
+                        <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => setIsHomepageMuted(m => { const next = !m; try { localStorage.setItem('signum-homepage-muted', String(next)) } catch(e){}; return next })}
+                            aria-label={isHomepageMuted ? 'Unmute music' : 'Mute music'}
+                            className="rounded-full border-white/20 hover:bg-white/10 text-white"
+                        >
+                            {isHomepageMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                        </Button>
                         <Button
                             variant="outline"
                             size="icon"
@@ -81,12 +125,23 @@ export default function StageSelect({ onSelectStage }: StageSelectProps) {
                         </Button>
                     </div>
                 ) : (
-                    <Button
-                        onClick={() => setIsAuthOpen(true)}
-                        className="bg-white/10 hover:bg-white/20 text-white rounded-full px-4"
-                    >
-                        Login
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => setIsHomepageMuted(m => { const next = !m; try { localStorage.setItem('signum-homepage-muted', String(next)) } catch(e){}; return next })}
+                            aria-label={isHomepageMuted ? 'Unmute music' : 'Mute music'}
+                            className="rounded-full border-white/20 hover:bg-white/10 text-white"
+                        >
+                            {isHomepageMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                        </Button>
+                        <Button
+                            onClick={() => setIsAuthOpen(true)}
+                            className="bg-white/10 hover:bg-white/20 text-white rounded-full px-4"
+                        >
+                            Login
+                        </Button>
+                    </div>
                 )}
             </header>
 
@@ -155,6 +210,15 @@ export default function StageSelect({ onSelectStage }: StageSelectProps) {
                 isOpen={isAuthOpen}
                 onClose={() => setIsAuthOpen(false)}
                 onLoginSuccess={(email) => setUserEmail(email)}
+            />
+
+            {/* Homepage music (place at public/music/homepage.mp3) */}
+            <audio
+                ref={homepageAudioRef}
+                src="/music/homepage.mp3"
+                loop
+                preload="auto"
+                style={{ display: 'none' }}
             />
         </div>
     )
