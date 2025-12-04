@@ -5,15 +5,21 @@ import SignStreamGame from '@/components/SignStreamGame'
 import ActionGame from '@/components/ActionGame'
 import PoseGame from '@/components/PoseGame'
 import HoleInTheWallGame from '@/components/HoleInTheWallGame'
+import SpecialChallengeGame from '@/components/SpecialChallengeGame'
 import StageSelect from '@/components/StageSelect'
 import { Stage, STAGES } from '@/lib/stages'
 
 export default function Home() {
   const [currentStage, setCurrentStage] = useState<Stage | null>(null)
   const [isChallengeMode, setIsChallengeMode] = useState(false)
+  const [isPigGameMode, setIsPigGameMode] = useState(false)
 
   if (isChallengeMode) {
     return <HoleInTheWallGame onBack={() => setIsChallengeMode(false)} />
+  }
+
+  if (isPigGameMode) {
+    return <SpecialChallengeGame onBack={() => setIsPigGameMode(false)} />
   }
 
   if (currentStage) {
@@ -30,6 +36,7 @@ export default function Home() {
     <StageSelect
       onSelectStage={setCurrentStage}
       onSelectChallenge={() => setIsChallengeMode(true)}
+      onSelectPigGame={() => setIsPigGameMode(true)}
     />
   )
 }
