@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import Webcam from 'react-webcam'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Zap, Play, Loader2, ArrowLeft, Share2, Video, Camera } from 'lucide-react'
+import { Zap, Play, Loader2, ArrowLeft, Share2, Video, Camera, Volume2, VolumeX } from 'lucide-react'
 import { toast } from "sonner"
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -60,6 +60,49 @@ export default function ActionGame({ stage, onBack }: ActionGameProps) {
     const [recordingUrl, setRecordingUrl] = useState<string | null>(null)
     const mediaRecorderRef = useRef<MediaRecorder | null>(null)
     const recordedChunksRef = useRef<Blob[]>([])
+
+    // Audio State
+    const audioRef = useRef<HTMLAudioElement | null>(null)
+    const hitAudioRef = useRef<HTMLAudioElement | null>(null)
+    const clearedAudioRef = useRef<HTMLAudioElement | null>(null)
+    const [isMusicMuted, setIsMusicMuted] = useState<boolean>(() => {
+        try {
+            const v = localStorage.getItem('signstream-muted')
+            return v === 'true'
+        } catch (e) {
+            return false
+        }
+    })
+    const [musicVolume, setMusicVolume] = useState<number>(() => {
+        try {
+            const v = localStorage.getItem('signstream-volume')
+            return v ? parseFloat(v) : 0.6
+        } catch (e) {
+            return 0.6
+        }
+    })
+
+    const playHitSound = async () => {
+        try {
+            if (hitAudioRef.current) {
+                hitAudioRef.current.currentTime = 0
+                await hitAudioRef.current.play()
+            }
+        } catch (e) {
+            console.warn('Hit sound play failed:', e)
+        }
+    }
+
+    const playClearedSound = async () => {
+        try {
+            if (clearedAudioRef.current) {
+                clearedAudioRef.current.currentTime = 0
+                await clearedAudioRef.current.play()
+            }
+        } catch (e) {
+            console.warn('Stage cleared sound play failed:', e)
+        }
+    }
 
     const rootRef = useRef<HTMLDivElement>(null)
     const gameLoopRef = useRef<number>(0)
@@ -143,6 +186,56 @@ export default function ActionGame({ stage, onBack }: ActionGameProps) {
         if (!isModelLoading) predictWebcam();
     }, [isModelLoading, predictWebcam]);
 
+    // Audio Sync Effects
+    useEffect(() => {
+        try {
+            localStorage.setItem('signstream-muted', String(isMusicMuted))
+        } catch (e) { }
+        if (audioRef.current) {
+            audioRef.current.muted = isMusicMuted
+        }
+    }, [isMusicMuted])
+
+    useEffect(() => {
+        try {
+            localStorage.setItem('signstream-volume', String(musicVolume))
+        } catch (e) { }
+        if (audioRef.current) {
+            audioRef.current.volume = musicVolume
+        }
+    }, [musicVolume])
+
+    // Pause audio on game over
+    useEffect(() => {
+        if (gameOver) {
+            try {
+                if (audioRef.current) {
+                    audioRef.current.pause()
+                }
+            } catch (e) { }
+        }
+    }, [gameOver])
+
+    // Fallback: ensure audio restarts if 'loop' isn't honored
+    useEffect(() => {
+        const audio = audioRef.current
+        if (!audio) return
+
+        const onEnded = () => {
+            try {
+                audio.currentTime = 0
+                void audio.play()
+            } catch (e) {
+                console.warn('Failed to restart audio on ended:', e)
+            }
+        }
+
+        audio.addEventListener('ended', onEnded)
+        return () => {
+            audio.removeEventListener('ended', onEnded)
+        }
+    }, [])
+
     // Recording Functions
     const startRecording = async () => {
         try {
@@ -151,7 +244,7 @@ export default function ActionGame({ stage, onBack }: ActionGameProps) {
                     mediaSource: 'tab',
                     preferCurrentTab: true
                 } as any,
-                audio: false,
+                audio: true, // Capture audio too
                 preferCurrentTab: true
             } as any);
 
@@ -300,6 +393,7 @@ export default function ActionGame({ stage, onBack }: ActionGameProps) {
                 setGameOver(true);
                 setGameWon(true);
                 saveScore(stage.id.toString(), score);
+                void playClearedSound();
 
                 // Save local progress
                 try {
@@ -331,6 +425,7 @@ export default function ActionGame({ stage, onBack }: ActionGameProps) {
                     setScore(s => s + 500 + (streak * 50));
                     setStreak(s => s + 1);
                     setTotalHits(h => h + 1);
+                    void playHitSound();
                     return newTiles;
                 }
             }
@@ -365,6 +460,18 @@ export default function ActionGame({ stage, onBack }: ActionGameProps) {
             await startRecording();
         }
 
+        // Start background music
+        try {
+            if (audioRef.current) {
+                audioRef.current.currentTime = 0
+                audioRef.current.volume = musicVolume
+                audioRef.current.muted = isMusicMuted
+                await audioRef.current.play()
+            }
+        } catch (e) {
+            console.warn('Background audio play failed:', e)
+        }
+
         // Reset spawn timer to trigger immediate spawn when game starts
         spawnTimerRef.current = 2000;
 
@@ -390,6 +497,16 @@ export default function ActionGame({ stage, onBack }: ActionGameProps) {
         return () => cancelAnimationFrame(gameLoopRef.current)
     }, [gameActive, countdown, updateGame])
 
+    const handleBack = () => {
+        try {
+            if (audioRef.current) {
+                audioRef.current.pause()
+                audioRef.current.currentTime = 0
+            }
+        } catch (e) { }
+        onBack()
+    }
+
     return (
         <div ref={rootRef} className="relative w-full h-screen max-w-md mx-auto bg-black overflow-hidden flex flex-col font-sans select-none">
             {/* Webcam & Overlay */}
@@ -407,14 +524,36 @@ export default function ActionGame({ stage, onBack }: ActionGameProps) {
 
             {/* HUD */}
             <div className="relative z-10 p-4 flex justify-between items-start">
-                <Button variant="ghost" size="icon" onClick={onBack} className="text-white hover:text-neon-blue">
+                <Button variant="ghost" size="icon" onClick={handleBack} className="text-white hover:text-neon-blue z-20">
                     <ArrowLeft />
                 </Button>
-                <div className="flex flex-col items-center">
+
+                {/* Center Score - Absolutely positioned */}
+                <div className="absolute left-1/2 top-4 -translate-x-1/2 flex flex-col items-center z-10 pointer-events-none">
                     <div className="text-4xl font-black text-white">{score}</div>
                     <div className="text-xs text-neon-blue font-bold">ACTION POINTS</div>
                 </div>
-                <div className="w-10" />
+
+                {/* Audio Controls */}
+                <div className="flex items-center gap-2 bg-black/50 backdrop-blur-md px-2 py-1 rounded-full border border-white/20 z-20">
+                    <button
+                        onClick={() => setIsMusicMuted(m => { const next = !m; try { localStorage.setItem('signstream-muted', String(next)) } catch (e) { }; return next })}
+                        aria-label={isMusicMuted ? 'Unmute music' : 'Mute music'}
+                        className="text-white hover:text-neon-blue"
+                    >
+                        {isMusicMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                    </button>
+                    <input
+                        aria-label="Music volume"
+                        type="range"
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        value={musicVolume}
+                        onChange={(e) => setMusicVolume(parseFloat(e.target.value))}
+                        className="w-16"
+                    />
+                </div>
             </div>
 
             {/* Game Area */}
@@ -542,11 +681,32 @@ export default function ActionGame({ stage, onBack }: ActionGameProps) {
                         </div>
                     ) : null}
 
-                    <Button onClick={onBack} className="bg-white text-black font-bold px-8 py-4 rounded-full">
+                    <Button onClick={handleBack} className="bg-white text-black font-bold px-8 py-4 rounded-full">
                         BACK TO MENU
                     </Button>
                 </div>
             )}
+
+            {/* Audio Elements */}
+            <audio
+                ref={audioRef}
+                src="/music/background.mp3"
+                loop
+                preload="auto"
+                style={{ display: 'none' }}
+            />
+            <audio
+                ref={hitAudioRef}
+                src="/sfx/hit.wav"
+                preload="auto"
+                style={{ display: 'none' }}
+            />
+            <audio
+                ref={clearedAudioRef}
+                src="/sfx/stage-cleared.wav"
+                preload="auto"
+                style={{ display: 'none' }}
+            />
         </div>
     )
 }
