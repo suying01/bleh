@@ -46,6 +46,8 @@ export default function SignStreamGame({ stage, onBack }: SignStreamGameProps) {
     const [gameOver, setGameOver] = useState(false)
     const [gameWon, setGameWon] = useState(false)
     const [score, setScore] = useState(0)
+    const [totalHits, setTotalHits] = useState(0)
+    const [totalMisses, setTotalMisses] = useState(0)
     const [streak, setStreak] = useState(0)
     const [tiles, setTiles] = useState<Tile[]>([])
     const [currentPhraseIndex, setCurrentPhraseIndex] = useState(0)
@@ -296,6 +298,7 @@ export default function SignStreamGame({ stage, onBack }: SignStreamGameProps) {
                 // Miss condition
                 if (newY > 100 && !tile.isMissed) {
                     setStreak(0)
+                    setTotalMisses(m => m + 1)
                     return { ...tile, y: newY, isMissed: true }
                 }
 
@@ -336,6 +339,7 @@ export default function SignStreamGame({ stage, onBack }: SignStreamGameProps) {
                     newTiles[firstActiveTileIndex] = { ...newTiles[firstActiveTileIndex], isHit: true };
                     setScore(s => s + 100 + (streak * 10));
                     setStreak(s => s + 1);
+                    setTotalHits(h => h + 1);
                     return newTiles;
                 }
             }
@@ -375,7 +379,10 @@ export default function SignStreamGame({ stage, onBack }: SignStreamGameProps) {
     // Start Game Sequence
     const startGame = async () => {
         setScore(0)
+        setScore(0)
         setStreak(0)
+        setTotalHits(0)
+        setTotalMisses(0)
         setTiles([])
         setCountdown(3)
         setCurrentPhraseIndex(0)
@@ -593,8 +600,19 @@ export default function SignStreamGame({ stage, onBack }: SignStreamGameProps) {
                     <h1 className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-neon-blue to-neon-pink mb-4 drop-shadow-lg">
                         {gameWon ? "STAGE CLEARED!" : "GAME OVER"}
                     </h1>
-                    <div className="text-6xl font-bold text-white mb-8">
+                    <div className="text-6xl font-bold text-white mb-4">
                         {score.toLocaleString()}
+                    </div>
+
+                    <div className="flex justify-center items-center gap-4 mb-8 text-white/80">
+                        <div className="flex flex-col items-center">
+                            <span className="text-sm uppercase tracking-wider">Accuracy</span>
+                            <span className="text-2xl font-bold text-green-400">
+                                {totalHits + totalMisses > 0
+                                    ? Math.round((totalHits / (totalHits + totalMisses)) * 100)
+                                    : 0}%
+                            </span>
+                        </div>
                     </div>
 
                     <div className="flex flex-col gap-4 w-full max-w-xs">

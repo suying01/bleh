@@ -169,6 +169,7 @@ export default function StageSelect({ onSelectStage, onSelectChallenge }: StageS
                 transition={{ delay: 0.4 }}
                 className="w-full max-w-md"
             >
+                {/*}
                 <Button
                     onClick={onSelectChallenge}
                     className="w-full h-24 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 border-2 border-white/20 rounded-2xl relative overflow-hidden group"
@@ -187,6 +188,7 @@ export default function StageSelect({ onSelectStage, onSelectChallenge }: StageS
 
                     <Play className="absolute right-6 w-8 h-8 text-white opacity-50 group-hover:opacity-100 group-hover:scale-110 transition-all" />
                 </Button>
+                */}
             </motion.div>
 
             <AuthModal

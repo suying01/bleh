@@ -44,6 +44,8 @@ export default function ActionGame({ stage, onBack }: ActionGameProps) {
     const [gameOver, setGameOver] = useState(false)
     const [gameWon, setGameWon] = useState(false)
     const [score, setScore] = useState(0)
+    const [totalHits, setTotalHits] = useState(0)
+    const [totalMisses, setTotalMisses] = useState(0)
     const [streak, setStreak] = useState(0)
     const [tiles, setTiles] = useState<Tile[]>([])
     const [currentPhraseIndex, setCurrentPhraseIndex] = useState(0)
@@ -277,6 +279,7 @@ export default function ActionGame({ stage, onBack }: ActionGameProps) {
                 const newY = tile.y + (tile.speed * deltaTime)
                 if (newY > 100 && !tile.isMissed) {
                     setStreak(0)
+                    setTotalMisses(m => m + 1)
                     return { ...tile, y: newY, isMissed: true }
                 }
                 return { ...tile, y: newY }
@@ -327,6 +330,7 @@ export default function ActionGame({ stage, onBack }: ActionGameProps) {
                     newTiles[targetIndex] = { ...tile, isHit: true };
                     setScore(s => s + 500 + (streak * 50));
                     setStreak(s => s + 1);
+                    setTotalHits(h => h + 1);
                     return newTiles;
                 }
             }
@@ -346,6 +350,8 @@ export default function ActionGame({ stage, onBack }: ActionGameProps) {
     const startGame = async () => {
         setScore(0)
         setStreak(0)
+        setTotalHits(0)
+        setTotalMisses(0)
         setTiles([])
         setCountdown(3)
         setCurrentPhraseIndex(0)
@@ -507,7 +513,18 @@ export default function ActionGame({ stage, onBack }: ActionGameProps) {
             {gameOver && (
                 <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center">
                     <h1 className="text-5xl font-black text-white mb-4">{gameWon ? "CLEARED!" : "FAILED"}</h1>
-                    <div className="text-4xl font-bold text-neon-blue mb-8">{score}</div>
+                    <div className="text-4xl font-bold text-neon-blue mb-4">{score}</div>
+
+                    <div className="flex justify-center items-center gap-4 mb-8 text-white/80">
+                        <div className="flex flex-col items-center">
+                            <span className="text-sm uppercase tracking-wider">Accuracy</span>
+                            <span className="text-2xl font-bold text-green-400">
+                                {totalHits + totalMisses > 0
+                                    ? Math.round((totalHits / (totalHits + totalMisses)) * 100)
+                                    : 0}%
+                            </span>
+                        </div>
+                    </div>
 
                     {isProcessingVideo ? (
                         <div className="flex flex-col items-center gap-2 mb-8">
